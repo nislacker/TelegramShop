@@ -10,6 +10,7 @@ namespace TelegramShop
     {
         static void Main(string[] args)
         {
+
         }
     }
 }
