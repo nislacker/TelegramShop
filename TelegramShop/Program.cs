@@ -131,6 +131,7 @@ namespace TelegramShop
             {
                 case "/start":
                     string text =
+"Добро пожаловать в наш Telegram-магазин\nженского белья 'EShop'!\n" +
 @"Список команд:
 /start - запуск бота
 /callback - вывод меню
@@ -172,17 +173,33 @@ namespace TelegramShop
                     {
                         new[]
                         {
-                            new KeyboardButton("Привет"),
-                            new KeyboardButton("Как дела?")
+                            new KeyboardButton("📁 Каталог"),
+                            new KeyboardButton("🛒 Корзина")
                         },
                         new[]
                         {
-                            new KeyboardButton("Контакт") { RequestContact = true },
-                            new KeyboardButton("Геолокация") { RequestLocation = true }
+                            new KeyboardButton("📦 Заказы"),
+                            new KeyboardButton("📢 Новости")
+                        },
+                        new[]
+                        {
+                            new KeyboardButton("⚙ Настройки"),
+                            new KeyboardButton("❓ Помощь")
+                        },
+                        new[]
+                        {
+                            new KeyboardButton(" Мой Контакт") { RequestContact = true },
+                            new KeyboardButton("Моя Геолокация") { RequestLocation = true }
                         }
                     });
                     await Bot.SendTextMessageAsync(message.Chat.Id, "Сообщение", replyMarkup: replyKeyboard);
                     break;
+                case "Каталог":
+                    // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
+                    // message.From.Id -- Id чата
+                    await Bot.SendTextMessageAsync(message.From.Id, "");
+                    break;
+
                 default:
                     break;
             }
