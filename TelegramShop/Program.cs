@@ -22,12 +22,12 @@ namespace TelegramShop
     class Program
     {
         static TelegramBotClient Bot;
-        static void Main(string[] args)
-        {
-            #region DatabaseOperations
 
-            string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
-            // "Database=eshop;Datasource=localhost;User=root";
+        static string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
+
+        static public List<string> GetAllCategories(string connectionString)
+        {
+            List<string> categories = new List<string>();
 
             try
             {
@@ -49,31 +49,40 @@ namespace TelegramShop
                     using (DbDataReader reader = sqlCommand.ExecuteReader())
                     {
                         // вывести названия полей (столбцов) таблицы
-                        for (int i = 0; i < reader.FieldCount; i++)
-                        {
-                            Console.WriteLine((reader).GetName(i));
-                        }
-                        Console.WriteLine();
+                        //for (int i = 0; i < reader.FieldCount; i++)
+                        //{
+                        //    //Console.WriteLine((reader).GetName(i));
+                        //}
+                        //Console.WriteLine();
 
-                        Console.WriteLine("Field Count = " + reader.FieldCount);
+                        //Console.WriteLine("Field Count = " + reader.FieldCount);
 
-                        Console.WriteLine($"Id:\tName:\tSortOrder:\tStatus:");
+                        //Console.WriteLine($"Id:\tName:\tSortOrder:\tStatus:");
 
                         while (reader.Read())
                         {
-                            Console.WriteLine($"{reader[0]}\t{reader["name"]}\t{reader["sort_order"]}\t{reader["status"]}");
+                            //Console.WriteLine($"{reader[0]}\t{reader["name"]}\t{reader["sort_order"]}\t{reader["status"]}");
+                            categories.Add(reader["name"].ToString());
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                //Console.WriteLine(ex.Message);
+                categories.Add(ex.Message);
             }
 
-            #endregion DatabaseOperations
+            return categories;
+        }
 
-            #region TelegramShop
+        static void Main(string[] args)
+        {
+            // "Database=eshop;Datasource=localhost;User=root";
+
+
+
+
 
             // создать клиента бота на основе токена, который даёт Botfather
             // при создании бота
@@ -100,7 +109,6 @@ namespace TelegramShop
             // остановить получение сообщений
             Bot.StopReceiving();
 
-            #endregion TelegramShop
         }
 
         private static async void BonOnCallbackReceived(object sender, Telegram.Bot.Args.CallbackQueryEventArgs e)
@@ -110,6 +118,9 @@ namespace TelegramShop
             Console.WriteLine($"{name} нажал кнопку {buttonText}");
 
             await Bot.AnswerCallbackQueryAsync(e.CallbackQuery.Id, $"Вы нажали кнопку {buttonText}");
+
+
+
         }
 
         //  async -- асинхронная обработка получаемых сообщений
@@ -117,6 +128,9 @@ namespace TelegramShop
         private static async void BotOnMessageReceived(object sender, Telegram.Bot.Args.MessageEventArgs e)
         {
             var message = e.Message;
+
+            string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
+
 
             // если тип сообщения -- не текст, выходим из метода
             if (message == null || message.Type != MessageType.Text)
@@ -188,16 +202,41 @@ namespace TelegramShop
                         },
                         new[]
                         {
-                            new KeyboardButton(" Мой Контакт") { RequestContact = true },
-                            new KeyboardButton("Моя Геолокация") { RequestLocation = true }
+                            new KeyboardButton("☎ Мой Контакт") { RequestContact = true },
+                            new KeyboardButton("📌 Моя Геолокация") { RequestLocation = true }
                         }
                     });
-                    await Bot.SendTextMessageAsync(message.Chat.Id, "Сообщение", replyMarkup: replyKeyboard);
+                    await Bot.SendTextMessageAsync(message.Chat.Id, "Меню", replyMarkup: replyKeyboard);
                     break;
-                case "Каталог":
+                case "📁 Каталог":
                     // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
                     // message.From.Id -- Id чата
-                    await Bot.SendTextMessageAsync(message.From.Id, "");
+                    await Bot.SendTextMessageAsync(message.From.Id, "Каталог");
+
+                    List<string> categories = GetAllCategories(connectionString);
+
+                    List<InlineKeyboardButton> categoriesButtons = new List<InlineKeyboardButton>();
+
+                    List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
+
+                    foreach (string category in categories)
+                    {
+                        InlineKeyboardButton button = InlineKeyboardButton.WithCallbackData(category);
+                        categoriesButtons.Add(button);
+                        categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[]{ button }));
+                    }
+
+                    // массив кнопок меню
+                    var catalogInlineKeyboard = new InlineKeyboardMarkup(categoriesGroupsOfButtons);
+
+                    try
+                    {
+                        // отправка клавиатуры в чат пользователю
+                        await Bot.SendTextMessageAsync(message.From.Id, "Выберите раздел, чтобы вывести список товаров:", replyMarkup: catalogInlineKeyboard);
+                    }
+                    catch
+                    { }
+
                     break;
 
                 default:
