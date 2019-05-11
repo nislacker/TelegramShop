@@ -115,9 +115,9 @@ namespace TelegramShop
             return -1; // ошибка -- нет такой категории
         }
 
-        static public List<string> GetAllProductsByCategoryId(int categoryId)
+        static public List<Product> GetAllProductsByCategoryId(int categoryId)
         {
-            List<string> products = new List<string>();
+            List<Product> products = new List<Product>();
 
             try
             {
@@ -129,13 +129,8 @@ namespace TelegramShop
 
                     MySqlCommand sqlCommand = sqlConnection.CreateCommand();
                     // Избавиться от возможного SQL_Injection
-                    sqlCommand.CommandText = $"SELECT description FROM product WHERE category_id={categoryId};";
+                    sqlCommand.CommandText = $"SELECT * FROM product WHERE category_id={categoryId};";
                     sqlCommand.Connection = sqlConnection;
-
-                    // Подсчитать кол-во строк в таблице
-                    //object result = (new MySqlCommand("SELECT COUNT(*) FROM category", sqlConnection).ExecuteScalar());
-                    //Console.WriteLine(((Int64)result));
-
 
                     using (DbDataReader reader = sqlCommand.ExecuteReader())
                     {
@@ -153,23 +148,24 @@ namespace TelegramShop
                         while (reader.Read())
                         {
                             //Console.WriteLine($"{reader[0]}\t{reader["name"]}\t{reader["sort_order"]}\t{reader["status"]}");
-                            products.Add(reader["description"].ToString());
+                            products.Add(new Product(Int32.Parse(reader["id"].ToString()), reader["name"].ToString(), Int32.Parse(reader["category_id"].ToString()), Int32.Parse(reader["code"].ToString()), double.Parse(reader["price"].ToString()), Int32.Parse(reader["availability"].ToString()), reader["brand"].ToString(), reader["description"].ToString(), Int32.Parse(reader["is_new"].ToString()), Int32.Parse(reader["is_recommended"].ToString()), Int32.Parse(reader["status"].ToString())));
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                //Console.WriteLine(ex.Message);
-                products.Add(ex.Message); // ?
+                Console.WriteLine(ex.Message);
             }
 
             return products;
         }
 
-        static public List<string> GetAllProductsByCategoryName(string categoryName)
+        static public List<Product> GetAllProductsByCategoryName(string categoryName)
         {
             int categoryId = GetCategoryIdByName(categoryName);
+
+            if (categoryId <= 0) return null;
 
             return GetAllProductsByCategoryId(categoryId);
         }
@@ -215,7 +211,7 @@ namespace TelegramShop
             {
                 html = string.Copy(html2);
             }
-            
+
             return html2;
         }
 
@@ -227,54 +223,41 @@ namespace TelegramShop
 
             var products = GetAllProductsByCategoryName(buttonText);
 
-            for (int i = 0; i < products.Count; ++i)
+            for (int i = 0; i < products?.Count; ++i)
             {
-                Console.WriteLine(products[i].Length);
-                products[i] = MinifyHTML(products[i]);
-                Console.WriteLine(products[i].Length);
-                Console.WriteLine(products[i]);
-
-                products[i] = WrapTextByHtmlTemplate(products[i]);
-
-                Console.WriteLine();
+                SendImageAndDescriptionOfProduct(products[i], e.CallbackQuery.From.Id);
             }
 
-            // ГОВНОКОД
-            if (products.Count > 0)
+            // значит нажата кнопка, не содержащая название категории товара
+            if (products == null)
             {
-                //await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "[.](https://i.ytimg.com/vi/hYvkSHYh_WQ/hqdefault.jpg)", ParseMode.Markdown); //???
-
-
-
-
-
-
-                /*
-                for (int j = 2; j < products.Count; j++)
+                switch (buttonText)
                 {
-
-                    // черное всплывающее и постепенно исчезающее окошко с текстом
-                    //await Bot.AnswerCallbackQueryAsync(e.CallbackQuery.Id, product);//$"Вы нажали кнопку {buttonText}");
-                    // e.CallbackQuery.From.Id -- Id чата
-                    //Console.WriteLine(product.Length);
-                    if (products[j].Length > 4096)
-                    {
-                        for (int i = 0; i < products[j].Length; i += 4096)
-                        {
-                            await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, products[j].Substring(i, products[j].Length - i < 4096 ? products[j].Length - i : 4096)); //???
-                        }
-                    }
-                    else
-                    {
-                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, products[j], ParseMode.Html); //???                        
-                    }
-                }*/
+                    case "🔍 Поиск":
+                        // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
+                        // message.From.Id -- Id чата
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите часть названия товара:");
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
         private static string WrapTextByHtmlTemplate(string text)
         {
             return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title></title></head><body>" + text + "</body></html>";
+        }
+
+        public static async void SendImageAndDescriptionOfProduct(Product product, int chatId)
+        {
+            var FileUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{product.id}.jpg";
+            using (var stream = System.IO.File.Open(FileUrl, FileMode.Open))
+            {
+                string fileName = FileUrl.Split('\\').Last();
+                string text = $"{product.name}\nЦена: {product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{product.id}";
+                var test = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text);
+            }
         }
 
         //  async -- асинхронная обработка получаемых сообщений
@@ -284,7 +267,6 @@ namespace TelegramShop
             var message = e.Message;
 
             string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
-
 
             // если тип сообщения -- не текст, выходим из метода
             if (message == null || message.Type != MessageType.Text)
@@ -336,48 +318,6 @@ namespace TelegramShop
                     { }
 
                     break;
-                // send a photo
-                case "/photo":
-                    await Bot.SendChatActionAsync(message.Chat.Id, ChatAction.UploadPhoto);
-
-                    //const string file = @"C:/ospanel/domains/eshop/upload/images/products/37.jpg";
-
-                    //https://i.dailymail.co.uk/1s/2018/12/10/08/7227176-0-image-a-1_1544429820688.jpg";
-                    //https://scehlov.000webhostapp.com/upload/images/products/37.jpg";
-
-                    //var fileName = file.Split(Path.DirectorySeparatorChar).Last();
-                    /*
-                    await Bot.SendPhotoAsync(
-                            e.Message.Chat.Id,
-                            file,
-                            "Nice Picture");
-*/
-
-                    var FileUrl = @"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\37.jpg";
-                    using (var stream = System.IO.File.Open(FileUrl, FileMode.Open))
-                    {
-                        string fileName = FileUrl.Split('\\').Last();
-                        var test = await Bot.SendPhotoAsync(e.Message.Chat.Id, new InputOnlineFile(stream, fileName), "My Text");
-                    }
-                    // Create a web request to download the html file from your server
-                    //WebRequest req = WebRequest.Create("http://google.com");
-                    //req.Method = "GET";
-
-                    //using (var response = await req.GetResponseAsync())
-                    //using (var stream = response.GetResponseStream())
-                    //{
-                    //    await Bot.SendDocumentAsync(e.Message.Chat.Id, new Telegram.Bot.Types.InputFiles.InputOnlineFile(stream, "file.html"));//new FileToSend("file.html", stream));
-                    //}
-                    //await Bot.SendDocumentAsync(message.Chat.Id, new Telegram.Bot.Types.InputFiles.InputOnlineFile((""))
-
-                    //using (var fileStream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
-                    //{
-                    //    await Bot.SendPhotoAsync(
-                    //        message.Chat.Id,
-                    //        fileStream,
-                    //        "Nice Picture");
-                    //}
-                    break;
                 // клавиатура
                 case "/keyboard":
                     var replyKeyboard = new ReplyKeyboardMarkup(new[]
@@ -412,14 +352,17 @@ namespace TelegramShop
 
                     List<string> categories = GetAllCategories();
 
-                    List<InlineKeyboardButton> categoriesButtons = new List<InlineKeyboardButton>();
+                    //List<InlineKeyboardButton> categoriesButtons = new List<InlineKeyboardButton>();
 
                     List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
+
+                    InlineKeyboardButton searchButton = InlineKeyboardButton.WithCallbackData("🔍 Поиск");
+                    categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { searchButton }));
 
                     foreach (string category in categories)
                     {
                         InlineKeyboardButton button = InlineKeyboardButton.WithCallbackData(category);
-                        categoriesButtons.Add(button);
+                        //categoriesButtons.Add(button);
 
                         // в каждой группе кнопок будет по одной кнопке -- чтоб по горизонтали была одна кнопка и
                         // текст в ней отображался полностью (название категории товаров)
