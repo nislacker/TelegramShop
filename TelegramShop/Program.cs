@@ -28,8 +28,12 @@ namespace TelegramShop
     {
         static TelegramBotClient Bot;
 
+        static List<Product> products = new List<Product>();
+        static bool isDouble;
+        static double minPrice = 0;
+
         // последнее сообщение, посланное ботом для идентификации на какой вопрос отвечает пользователь
-        static string lastMessage; 
+        static string lastMessage;
 
         static string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
 
@@ -60,8 +64,8 @@ namespace TelegramShop
             }
             catch (Exception ex)
             {
-                //Console.WriteLine(ex.Message);
-                categories.Add(ex.Message);
+                Console.WriteLine(ex.Message);
+                //categories.Add(ex.Message);
             }
 
             return categories;
@@ -78,7 +82,8 @@ namespace TelegramShop
                     sqlConnection.Open();
 
                     MySqlCommand sqlCommand = sqlConnection.CreateCommand();
-                    sqlCommand.CommandText = $"SELECT id FROM category WHERE name=\"{categoryName}\" LIMIT 1;"; // ???
+                    // Избавиться от возможного SQL_Injection
+                    sqlCommand.CommandText = $"SELECT id FROM category WHERE name=\"{categoryName}\" LIMIT 1;";
                     sqlCommand.Connection = sqlConnection;
 
                     using (DbDataReader reader = sqlCommand.ExecuteReader())
@@ -113,6 +118,40 @@ namespace TelegramShop
                     MySqlCommand sqlCommand = sqlConnection.CreateCommand();
                     // Избавиться от возможного SQL_Injection
                     sqlCommand.CommandText = $"SELECT * FROM product WHERE category_id={categoryId};";
+                    sqlCommand.Connection = sqlConnection;
+
+                    using (DbDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            products.Add(new Product(Int32.Parse(reader["id"].ToString()), reader["name"].ToString(), Int32.Parse(reader["category_id"].ToString()), Int32.Parse(reader["code"].ToString()), double.Parse(reader["price"].ToString()), Int32.Parse(reader["availability"].ToString()), reader["brand"].ToString(), reader["description"].ToString(), Int32.Parse(reader["is_new"].ToString()), Int32.Parse(reader["is_recommended"].ToString()), Int32.Parse(reader["status"].ToString())));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return products;
+        }
+
+        static public List<Product> GetAllProducts()
+        {
+            List<Product> products = new List<Product>();
+
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    MySqlCommand sqlCommand = sqlConnection.CreateCommand();
+                    // Избавиться от возможного SQL_Injection
+                    sqlCommand.CommandText = $"SELECT * FROM product;";
                     sqlCommand.Connection = sqlConnection;
 
                     using (DbDataReader reader = sqlCommand.ExecuteReader())
@@ -177,7 +216,7 @@ namespace TelegramShop
 
         static void Main(string[] args)
         {
-            string API_token = "766708677:AAFO6OieruPegHjdTe0b7zaLAIoo2qJuJ10";
+            string API_token = System.Configuration.ConfigurationManager.AppSettings["TelegramBot_API_Token"];
             // создать клиента бота на основе токена, который даёт Botfather
             // при создании бота
             Bot = new TelegramBotClient(API_token);
@@ -264,8 +303,8 @@ namespace TelegramShop
                         break;
                     case "Цена":
                         // отправка клавиатуры в чат пользователю
-                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Цена товара до (грн):");
-                        lastMessage = "Цена товара до (грн):";
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Цена товара от (грн):");
+                        lastMessage = "Цена товара от (грн):";
                         break;
                     case "Часть названия":
                         // отправка клавиатуры в чат пользователю
@@ -274,8 +313,8 @@ namespace TelegramShop
                         break;
                     case "Код":
                         // отправка клавиатуры в чат пользователю
-                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Код товара:");
-                        lastMessage = "Код товара:";
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Часть или весь код товара:");
+                        lastMessage = "Часть или весь код товара:";
                         break;
                     default:
                         break;
@@ -288,15 +327,21 @@ namespace TelegramShop
             return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title></title></head><body>" + text + "</body></html>";
         }
 
-        public static async void SendImageAndDescriptionOfProduct(Product product, int chatId)
+        public static async void SendImageAndText(int chatId, string ImageUrl, string text)
         {
-            var FileUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{product.id}.jpg";
-            using (var stream = System.IO.File.Open(FileUrl, FileMode.Open))
+            using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
             {
-                string fileName = FileUrl.Split('\\').Last();
-                string text = $"{product.name}\nЦена: {product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{product.id}";
-                var test = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text);
+                string fileName = ImageUrl.Split('\\').Last();
+                await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html);
             }
+        }
+
+        public static void SendImageAndDescriptionOfProduct(Product product, int chatId)
+        {
+            var ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{product.id}.jpg";
+            string text = $"{product.name}\nЦена: {product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{product.id}";
+
+            SendImageAndText(chatId, ImageUrl, text);
         }
 
         //  async -- асинхронная обработка получаемых сообщений
@@ -311,17 +356,12 @@ namespace TelegramShop
             if (message == null || message.Type != MessageType.Text)
                 return;
 
-            // получить имя и фамилию пользовтеля, отправившего сообщение
-            string name = $"{message.From.FirstName} {message.From.LastName}";
-
-            //Console.WriteLine($"{name} отправил сообщение: {message.Text}");
-
             switch (message.Text)
             {
                 case "/start":
                     string text =
     "Добро пожаловать в наш Telegram-магазин\nженского белья 'EShop'!\n" +
-    @"Список команд:
+@"   Список команд:
 /start - запуск бота
 /callback - вывод меню
 /keyboard - вывод клавиатуры
@@ -378,10 +418,14 @@ namespace TelegramShop
                             new KeyboardButton("⚙ Настройки"),
                             new KeyboardButton("❓ Помощь")
                         },
+                        //new[]
+                        //{
+                        //    new KeyboardButton("☎ Мой Контакт") { RequestContact = true },
+                        //    new KeyboardButton("📌 Моя Геолокация") { RequestLocation = true }
+                        //},
                         new[]
                         {
-                            new KeyboardButton("☎ Мой Контакт") { RequestContact = true },
-                            new KeyboardButton("📌 Моя Геолокация") { RequestLocation = true }
+                            new KeyboardButton("🌍 Наши магазины на карте (Харьков)")// { RequestContact = true },
                         }
                     });
                     await Bot.SendTextMessageAsync(message.Chat.Id, "Меню", replyMarkup: replyKeyboard);
@@ -394,8 +438,6 @@ namespace TelegramShop
                     lastMessage = "Каталог";
 
                     List<string> categories = GetAllCategories();
-
-                    //List<InlineKeyboardButton> categoriesButtons = new List<InlineKeyboardButton>();
 
                     List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
 
@@ -425,10 +467,14 @@ namespace TelegramShop
 
                     break;
 
+                case "🌍 Наши магазины на карте (Харьков)":
+
+                    //await Bot.SendLocationAsync(message.From.Id, latitude: 49.993698f, longitude: 36.231924f);
+                    SendImageAndText(message.From.Id, "Map.jpg", "<a href='https://scehlov.000webhostapp.com/shops/'>Наши магазины</a>");
+                    break;
+
                 default:
                     // остальные сообщения
-
-                    List<Product> products = new List<Product>();
 
                     switch (lastMessage)
                     {
@@ -444,44 +490,80 @@ namespace TelegramShop
 
                             break;
 
-                        case "Цена товара до (грн):":
+                        case "Цена товара от (грн):":
+
+                            // меняем точки на запятые
+                            message.Text = Regex.Replace(message.Text, @"\.", ",");
+
+                            isDouble = Double.TryParse(message.Text, out minPrice);
+
+                            if (isDouble)
+                            {
+                                // !!! получить введенное от пользователя число -- цену товара для фильтрации запроса
+                                await Bot.SendTextMessageAsync(message.Chat.Id, "Цена товара до (грн) -- введите 0 для неограниченной сверху цены:");
+                                lastMessage = "Цена товара до (грн) -- введите 0 для неограниченной сверху цены:";
+                            }
+                            else
+                            {
+                                await Bot.SendTextMessageAsync(message.Chat.Id, "Цена товара должна быть числом!");
+                            }
+
+                            break;
+
+                        case "Цена товара до (грн) -- введите 0 для неограниченной сверху цены:":
 
                             double maxPrice;
                             // меняем точки на запятые
                             message.Text = Regex.Replace(message.Text, @"\.", ",");
-                            //message.Text
-                            bool isDouble = Double.TryParse(message.Text, out maxPrice);
+
+                            isDouble = Double.TryParse(message.Text, out maxPrice);
+
                             if (isDouble)
                             {
                                 // !!! получить введенное от пользователя число -- цену товара для фильтрации запроса
-                                await Bot.SendTextMessageAsync(message.Chat.Id, $"Товары до указанной цены:"); // $"Вы ввели цену: {message.Text}"
-                                lastMessage = "Товары до указанной цены:";
+                                await Bot.SendTextMessageAsync(message.Chat.Id, $"Товары в данном диапазоне цен:");
+                                lastMessage = "Товары в данном диапазоне цен:";
+
+                                if (maxPrice == 0) maxPrice = 9999999999999;
 
                                 // отобразить все товары сценой до или равной введенной пользователем
-                                products = GetAllProductsBetweenPrices(0, maxPrice);
+                                products = GetAllProductsBetweenPrices(minPrice, maxPrice);
 
                                 for (int i = 0; i < products?.Count; ++i)
                                 {
                                     SendImageAndDescriptionOfProduct(products[i], message.From.Id);
                                 }
                             }
-
+                            else
+                            {
+                                await Bot.SendTextMessageAsync(message.Chat.Id, "Цена товара должна быть числом!");
+                            }
                             break;
 
-                        case "Код товара:":
+                        case "Часть или весь код товара:":
 
                             int code;
-                            Int32.TryParse(message.Text, out code);
-                            Product product = GetProductByCode(code);
-                            SendImageAndDescriptionOfProduct(product, message.From.Id);
+                            bool isInt32 = Int32.TryParse(message.Text, out code);
+
+                            if (isInt32)
+                            {
+                                products = GetProductsByPartOfCode(code);
+
+                                foreach (Product product in products)
+                                {
+                                    SendImageAndDescriptionOfProduct(product, message.From.Id);
+                                }
+                            }
+                            else
+                            {
+                                await Bot.SendTextMessageAsync(message.Chat.Id, "Код товара должен быть числом!");
+                            }
 
                             break;
 
                         default:
                             break;
                     }
-
-
 
                     break;
             }
@@ -518,6 +600,22 @@ namespace TelegramShop
             }
 
             return product;
+        }
+
+        private static List<Product> GetProductsByPartOfCode(int partOfCode)
+        {
+            List<Product> allProducts = GetAllProducts();
+            List<Product> findedProducts = new List<Product>();
+
+            foreach (Product product in allProducts)
+            {
+                if (product.code.ToString().Contains(partOfCode.ToString()))
+                {
+                    findedProducts.Add(product);
+                }
+            }
+
+            return findedProducts;
         }
 
         private static List<Product> GetAllProductsByName(string text)
