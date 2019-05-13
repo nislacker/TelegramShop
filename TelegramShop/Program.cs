@@ -31,6 +31,7 @@ namespace TelegramShop
         static List<Product> products = new List<Product>();
         static bool isDouble;
         static double minPrice = 0;
+        static int productsInCart = 0;
 
         // последнее сообщение, посланное ботом для идентификации на какой вопрос отвечает пользователь
         static string lastMessage;
@@ -281,8 +282,6 @@ namespace TelegramShop
                     case "🔍 Поиск":
                         // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
                         // message.From.Id -- Id чата
-                        // await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите часть названия товара:");
-
                         InlineKeyboardButton nameButton = InlineKeyboardButton.WithCallbackData("Часть названия");
                         InlineKeyboardButton priceButton = InlineKeyboardButton.WithCallbackData("Цена");
                         InlineKeyboardButton codeButton = InlineKeyboardButton.WithCallbackData("Код");
@@ -302,19 +301,27 @@ namespace TelegramShop
 
                         break;
                     case "Цена":
-                        // отправка клавиатуры в чат пользователю
                         await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Цена товара от (грн):");
                         lastMessage = "Цена товара от (грн):";
                         break;
                     case "Часть названия":
-                        // отправка клавиатуры в чат пользователю
                         await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Название товара содержит:");
                         lastMessage = "Название товара содержит:";
                         break;
                     case "Код":
-                        // отправка клавиатуры в чат пользователю
                         await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Часть или весь код товара:");
                         lastMessage = "Часть или весь код товара:";
+                        break;
+                    case "В корзину":
+
+                        // Нужно добавить товар в корзину, который захотели поместить в корзину!
+                        // И радом с кнопкой "🛒 Корзина" обновить количество в ней товара "🛒 Корзина (3)" -- вот так, например
+
+                        ++productsInCart;
+                        ShowMenu(e.CallbackQuery.From.Id, productsInCart);
+
+                        //await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Укажите количество:", );
+                        lastMessage = "Укажите количество:";
                         break;
                     default:
                         break;
@@ -352,69 +359,17 @@ namespace TelegramShop
             SendImageAndText(chatId, ImageUrl, text);
         }
 
-        //  async -- асинхронная обработка получаемых сообщений
-        // можно одновременно получать и обрабатывать сообщения от разных пользователей
-        private static async void BotOnMessageReceived(object sender, Telegram.Bot.Args.MessageEventArgs e)
+        public static async void ShowMenu(int chatId, int productsInCart)
         {
-            var message = e.Message;
+            string cartButtonText = "🛒 Корзина";
+            if (productsInCart > 0) cartButtonText += $" ({productsInCart})";
 
-            string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
-
-            // если тип сообщения -- не текст, выходим из метода
-            if (message == null || message.Type != MessageType.Text)
-                return;
-
-            switch (message.Text)
-            {
-                case "/start":
-                    string text =
-    "Добро пожаловать в наш Telegram-магазин\nженского белья 'EShop'!\n" +
-@"   Список команд:
-/start - запуск бота
-/callback - вывод меню
-/keyboard - вывод клавиатуры
-/photo";
-                    // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
-                    // message.From.Id -- Id чата
-                    await Bot.SendTextMessageAsync(message.From.Id, text);
-                    lastMessage = text;
-                    break;
-
-                // меню
-                case "/callback":
-                    // массив кнопок меню
-                    var inlineKeyboard = new InlineKeyboardMarkup(new[]
-                    {
-                        new[]
-                        {
-                            InlineKeyboardButton.WithUrl("VK", "https://vk.com"),
-                            InlineKeyboardButton.WithUrl("Telegram", "https://t.me")
-                        },
-                        new[]
-                        {
-                            InlineKeyboardButton.WithCallbackData("Пункт 1"),
-                            InlineKeyboardButton.WithCallbackData("Пункт 2")
-                        }
-                    });
-
-                    try
-                    {
-                        // отправка клавиатуры в чат пользователю
-                        await Bot.SendTextMessageAsync(message.From.Id, "Выберите пункт меню", replyMarkup: inlineKeyboard);
-                        lastMessage = "Выберите пункт меню";
-                    }
-                    catch
-                    { }
-
-                    break;
-                // клавиатура
-                case "/keyboard":
-                    var replyKeyboard = new ReplyKeyboardMarkup(new[]
+            var replyKeyboard = new ReplyKeyboardMarkup(new[]
                     {
                         new[]
                         {
                             new KeyboardButton("📁 Каталог"),
-                            new KeyboardButton("🛒 Корзина")
+                            new KeyboardButton(cartButtonText)
                         },
                         new[]
                         {
@@ -436,8 +391,40 @@ namespace TelegramShop
                             new KeyboardButton("🌍 Наши магазины на карте (Харьков)")// { RequestContact = true },
                         }
                     });
-                    await Bot.SendTextMessageAsync(message.Chat.Id, "Меню", replyMarkup: replyKeyboard);
-                    lastMessage = "Меню";
+            await Bot.SendTextMessageAsync(chatId, "Меню", replyMarkup: replyKeyboard);
+            lastMessage = "Меню";
+        }
+
+        //  async -- асинхронная обработка получаемых сообщений
+        // можно одновременно получать и обрабатывать сообщения от разных пользователей
+        private static async void BotOnMessageReceived(object sender, Telegram.Bot.Args.MessageEventArgs e)
+        {
+            var message = e.Message;
+
+            string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
+
+            // если тип сообщения -- не текст, выходим из метода
+            if (message == null || message.Type != MessageType.Text)
+                return;
+
+            switch (message.Text)
+            {
+                case "/start":
+                    string text =
+    "Добро пожаловать в наш Telegram-магазин\nженского белья 'EShop'!\n" +
+@"   Список команд:
+/start - запуск бота
+/keyboard - вывод клавиатуры";
+
+                    // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
+                    // message.From.Id -- Id чата
+                    await Bot.SendTextMessageAsync(message.From.Id, text);
+                    lastMessage = text;
+                    break;
+
+                // клавиатура
+                case "/keyboard":
+                    ShowMenu(message.From.Id, productsInCart);
                     break;
                 case "📁 Каталог":
                     // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
