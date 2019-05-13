@@ -329,10 +329,18 @@ namespace TelegramShop
 
         public static async void SendImageAndText(int chatId, string ImageUrl, string text)
         {
+            InlineKeyboardButton putToCartButton = InlineKeyboardButton.WithCallbackData("В корзину");
+
+            List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { putToCartButton }));
+            var catalogInlineKeyboard = new InlineKeyboardMarkup(categoriesGroupsOfButtons);
+
+
             using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
             {
                 string fileName = ImageUrl.Split('\\').Last();
-                await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html);
+                await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
             }
         }
 
