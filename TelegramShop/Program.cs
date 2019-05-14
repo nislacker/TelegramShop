@@ -38,6 +38,8 @@ namespace TelegramShop
 
         static User user = null;
 
+        static ProductOrder productOrder = new ProductOrder();
+
         static Dictionary<int, Product> messageIdProductPairs = new Dictionary<int, Product>();
 
         //static List<ProductDetail> cart = new List<ProductDetail>();
@@ -397,8 +399,6 @@ namespace TelegramShop
 
                         cart.IncrementProductCount(currentProductDetail);
 
-
-
                         ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{currentProductDetail.Product.id}.jpg";
 
                         txt = $"{productsInCart[0].Product.name}\nЦена: {currentProductDetail.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{currentProductDetail.Product.id}";
@@ -512,18 +512,6 @@ namespace TelegramShop
 
 
                         break;
-
-                    //case "Введите логин (email):":
-
-                    //    emailLogin = e.CallbackQuery.Message.Text;
-
-                    //    if (lastMessage == "Вы зарегистрированы на сайте? ✅ Да")
-                    //    {
-                    //        lastMessage = "Введите логин(email):";
-                    //        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите пароль:");
-                    //    }
-
-                    //    break;
 
                     default:
                         if (buttonText.Contains("✅ Заказ на"))
@@ -823,7 +811,16 @@ namespace TelegramShop
                                      * status
                                      */
 
-                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите данные для выполнения заказа: ");
+                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите свой телефон:");
+                                    lastMessage = "Введите свой телефон:";
+
+                                    //var replyKeyboard = new ReplyKeyboardMarkup(new[]
+                                    //{
+                                    //    new KeyboardButton("☎ Мой Контакт") { RequestContact = true },
+                                    //    new KeyboardButton("Отмена")
+                                    //});
+
+                                    //message = await Bot.SendTextMessageAsync(message.From.Id, "Меню");//, replyMarkup: replyKeyboard);
                                 }
                                 else
                                 {
@@ -834,30 +831,26 @@ namespace TelegramShop
 
                             break;
 
-                        //    // "Введите пароль:":
+                        case "Введите свой телефон:":
 
-                        //    passwordLogin = message.Text;
+                            if ((message.Text != "Введите свой телефон:") && (message.Text != "Отмена"))
+                            {
+                                productOrder.User_phone = message.Text;
+                            }
 
-                        //    if (IsGoodLoginData(emailLogin, passwordLogin) != null)
-                        //    {
-                        //        /* id
-                        //         * user_name
-                        //         * user_phone
-                        //         * user_comment
-                        //         * user_id
-                        //         * date
-                        //         * products
-                        //         * status
-                        //         */
+                            await Bot.SendTextMessageAsync(message.From.Id, "Комментарий:");
+                            lastMessage = "Комментарий:";
 
-                        //        await Bot.SendTextMessageAsync(message.From.Id, "Введите данные для выполнения заказа: ");
-                        //    }
-                        //    else
-                        //    {
-                        //        GetLogin(message.From.Id);
-                        //    }
+                            break;
 
-                        //    break;
+                        case "Комментарий:":
+
+                            if ((message.Text != "Комментарий:") && (message.Text != "Отмена"))
+                            {
+                                productOrder.User_comment = message.Text;
+                            }
+
+                            break;
 
                         case "Название товара содержит:":
 
