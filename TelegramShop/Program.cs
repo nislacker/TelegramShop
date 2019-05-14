@@ -328,9 +328,124 @@ namespace TelegramShop
                         var p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
 
                         cart.Add(new ProductDetail { Count = 1, Product = p });
-                        
+
                         //lastMessage = "Укажите количество:";
                         break;
+
+                    case "▶":
+
+                        p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
+
+                        var productsInCart = cart.GetProductDetails();
+
+                        ProductDetail nextProduct = null;
+
+                        if (productsInCart.Count > cart.ProductIndexInCart(p) + 1)
+                            nextProduct = productsInCart[cart.ProductIndexInCart(p) + 1];
+
+                        if (nextProduct == null) return;
+
+                        var ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{nextProduct.Product.id}.jpg";
+
+                        string txt = $"{productsInCart[0].Product.name}\nЦена: {nextProduct.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{nextProduct.Product.id}";
+
+                        SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, nextProduct, cart.ProductIndexInCart(p) + 1);
+
+                        // удаление сообщения
+                        await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+
+                        break;
+
+                    case "◀":
+
+                        p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
+
+                        productsInCart = cart.GetProductDetails();
+
+                        ProductDetail previousProduct = null;
+
+                        if (0 <= cart.ProductIndexInCart(p) - 1)
+                            previousProduct = productsInCart[cart.ProductIndexInCart(p) - 1];
+
+                        if (previousProduct == null) return;
+
+                        ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{previousProduct.Product.id}.jpg";
+
+                        txt = $"{productsInCart[0].Product.name}\nЦена: {previousProduct.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{previousProduct.Product.id}";
+
+                        SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, previousProduct, cart.ProductIndexInCart(p) - 1);
+
+                        // удаление сообщения
+                        await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+
+                        break;
+
+                    case "❌":
+
+                        // если в корзине это единственный товар, то показать сообщение что в корзине нет товаров, 
+                        // иначе если это не последний товар, то показать следующий товар,
+                        // иначе показать предыдущий товар
+
+                        p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
+
+                        productsInCart = cart.GetProductDetails();
+
+                        int currentProductIndex = cart.ProductIndexInCart(p);
+
+                        ProductDetail currentProductDetail = productsInCart[currentProductIndex];
+
+                        cart.DeleteProductDetailByProductDetail(currentProductDetail);
+
+                        if (productsInCart.Count == 0)
+                        {
+                            await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "В корзине пусто... 😭");
+                            // удаление сообщения
+                            await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+                        }
+                        else if (productsInCart.Count == 1)
+                        {
+                            nextProduct = productsInCart[0];
+
+                            ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{nextProduct.Product.id}.jpg";
+
+                            txt = $"{nextProduct.Product.name}\nЦена: {nextProduct.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{nextProduct.Product.id}";
+
+                            SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, nextProduct, 0);
+
+                            // удаление сообщения
+                            await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+                        }
+                        // товар не последний
+                        else if (currentProductIndex < productsInCart.Count - 1)
+                        {
+                            nextProduct = productsInCart[currentProductIndex + 1];
+
+                            ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{nextProduct.Product.id}.jpg";
+
+                            txt = $"{nextProduct.Product.name}\nЦена: {nextProduct.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{nextProduct.Product.id}";
+
+                            SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, nextProduct, currentProductIndex);
+
+                            // удаление сообщения
+                            await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+                        }
+                        // данный товар -- последний
+                        else
+                        {
+                            previousProduct = productsInCart[currentProductIndex - 1];
+
+                            ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{previousProduct.Product.id}.jpg";
+
+                            txt = $"{previousProduct.Product.name}\nЦена: {previousProduct.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{previousProduct.Product.id}";
+
+                            SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, previousProduct, currentProductIndex - 1);
+
+                            // удаление сообщения
+                            await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+                        }
+
+                        break;
+
                     default:
                         break;
                 }
@@ -421,11 +536,11 @@ namespace TelegramShop
                             new KeyboardButton("📦 Заказы"),
                             new KeyboardButton("📢 Новости")
                         },
-                        new[]
-                        {
-                            new KeyboardButton("⚙ Настройки"),
-                            new KeyboardButton("❓ Помощь")
-                        },
+                        //new[]
+                        //{
+                        //    new KeyboardButton("⚙ Настройки"),
+                        //    new KeyboardButton("❓ Помощь")
+                        //},
                         //new[]
                         //{
                         //    new KeyboardButton("☎ Мой Контакт") { RequestContact = true },
@@ -514,7 +629,7 @@ namespace TelegramShop
 
                     break;
 
-                
+
 
                 case "🌍 Наши магазины на карте (Харьков)":
 
@@ -537,7 +652,6 @@ namespace TelegramShop
                     */
 
                     var productsInCart = cart.GetProductDetails();
-                    //var firstProductInCart = productsInCart.First();
 
                     var ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{productsInCart[0].Product.id}.jpg";
 

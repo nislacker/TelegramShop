@@ -24,7 +24,21 @@ namespace TelegramShop
             return totalPrice;
         }
 
-        public int IsCartContainProduct(ProductDetail productDetail)
+        public bool DeleteProductDetailByProductDetail(ProductDetail productDetail)
+        {
+            for (int i = 0; i < ProductDetails.Count; ++i)
+            {
+                if (ProductDetails[i].Product.id == productDetail.Product.id)
+                {
+                    ProductDetails.Remove(productDetail);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public int ProductIndexInCart(ProductDetail productDetail)
         {
             for (int i = 0; i < ProductDetails.Count; ++i)
             {
@@ -35,9 +49,20 @@ namespace TelegramShop
             return -1;
         }
 
+        public int ProductIndexInCart(Product product)
+        {
+            for (int i = 0; i < ProductDetails.Count; ++i)
+            {
+                if (ProductDetails[i].Product.id == product.id)
+                    return i;
+            }
+
+            return -1;
+        }
+
         public void Add(ProductDetail productDetail)
         {
-            int index = IsCartContainProduct(productDetail);
+            int index = ProductIndexInCart(productDetail);
 
             if (index == -1)
                 ProductDetails.Add(productDetail);
