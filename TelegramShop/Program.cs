@@ -33,6 +33,11 @@ namespace TelegramShop
         static double minPrice = 0;
         static int productsInCart = 0;
 
+        static Dictionary<int, Product> messageIdProductPairs = new Dictionary<int, Product>();
+
+        //static List<ProductDetail> cart = new List<ProductDetail>();
+        static Cart cart = new Cart();
+
         // последнее сообщение, посланное ботом для идентификации на какой вопрос отвечает пользователь
         static string lastMessage;
 
@@ -264,8 +269,8 @@ namespace TelegramShop
             string buttonText = e.CallbackQuery.Data;
 
             // для отладки
-            string name = $"{e.CallbackQuery.From.FirstName} {e.CallbackQuery.From.LastName}";
-            Console.WriteLine($"{name} нажал кнопку {buttonText}");
+            //string name = $"{e.CallbackQuery.From.FirstName} {e.CallbackQuery.From.LastName}";
+            //Console.WriteLine($"{name} нажал кнопку {buttonText}");
 
             var products = GetAllProductsByCategoryName(buttonText);
 
@@ -320,8 +325,19 @@ namespace TelegramShop
                         ++productsInCart;
                         ShowMenu(e.CallbackQuery.From.Id, productsInCart);
 
-                        //await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Укажите количество:", );
-                        lastMessage = "Укажите количество:";
+                        var p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
+
+                        cart.Add(new ProductDetail { Count = 1, Product = p });
+
+                        string info = "";
+
+                        foreach (var item in cart.GetProductDetails())
+                        {
+                            info += item.Product.name + ": " + item.Count + "\n";
+                        }
+
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, info);
+                        //lastMessage = "Укажите количество:";
                         break;
                     default:
                         break;
@@ -334,9 +350,11 @@ namespace TelegramShop
             return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title></title></head><body>" + text + "</body></html>";
         }
 
-        public static async void SendImageAndText(int chatId, string ImageUrl, string text)
+        public static async void SendImageAndText(int chatId, string ImageUrl, string text, Product product)
         {
-            InlineKeyboardButton putToCartButton = InlineKeyboardButton.WithCallbackData("В корзину");
+            InlineKeyboardButton putToCartButton;
+
+            putToCartButton = InlineKeyboardButton.WithCallbackData("В корзину");
 
             List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
 
@@ -347,7 +365,10 @@ namespace TelegramShop
             using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
             {
                 string fileName = ImageUrl.Split('\\').Last();
-                await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
+                var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
+
+                // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
+                messageIdProductPairs.Add(message.MessageId, product);
             }
         }
 
@@ -356,7 +377,7 @@ namespace TelegramShop
             var ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{product.id}.jpg";
             string text = $"{product.name}\nЦена: {product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{product.id}";
 
-            SendImageAndText(chatId, ImageUrl, text);
+            SendImageAndText(chatId, ImageUrl, text, product);
         }
 
         public static async void ShowMenu(int chatId, int productsInCart)
@@ -391,7 +412,11 @@ namespace TelegramShop
                             new KeyboardButton("🌍 Наши магазины на карте (Харьков)")// { RequestContact = true },
                         }
                     });
-            await Bot.SendTextMessageAsync(chatId, "Меню", replyMarkup: replyKeyboard);
+            var message = await Bot.SendTextMessageAsync(chatId, "Меню", replyMarkup: replyKeyboard);
+
+            // удаление сообщения
+            // await Bot.DeleteMessageAsync(chatId, message.MessageId);
+
             lastMessage = "Меню";
         }
 
@@ -462,10 +487,15 @@ namespace TelegramShop
 
                     break;
 
+                case "🛒 Корзина":
+
+
+                    break;
+
                 case "🌍 Наши магазины на карте (Харьков)":
 
                     //await Bot.SendLocationAsync(message.From.Id, latitude: 49.993698f, longitude: 36.231924f);
-                    SendImageAndText(message.From.Id, "Map.jpg", "<a href='https://scehlov.000webhostapp.com/shops/'>Наши магазины</a>");
+                    SendImageAndText(message.From.Id, "Map.jpg", "<a href='https://scehlov.000webhostapp.com/shops/'>Наши магазины</a>", null);
                     break;
 
                 default:
