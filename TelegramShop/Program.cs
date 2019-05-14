@@ -33,6 +33,11 @@ namespace TelegramShop
         static double minPrice = 0;
         static int productsInCartCount = 0;
 
+        static string emailLogin;
+        static string passwordLogin;
+
+        static User user = null;
+
         static Dictionary<int, Product> messageIdProductPairs = new Dictionary<int, Product>();
 
         //static List<ProductDetail> cart = new List<ProductDetail>();
@@ -496,10 +501,84 @@ namespace TelegramShop
 
                         break;
 
+                    case "✅ Да":
+
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите логин (email):");
+                        lastMessage = "Введите логин (email):";
+
+                        break;
+
+                    case "❌ Нет":
+
+
+                        break;
+
+                    //case "Введите логин (email):":
+
+                    //    emailLogin = e.CallbackQuery.Message.Text;
+
+                    //    if (lastMessage == "Вы зарегистрированы на сайте? ✅ Да")
+                    //    {
+                    //        lastMessage = "Введите логин(email):";
+                    //        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите пароль:");
+                    //    }
+
+                    //    break;
+
                     default:
+                        if (buttonText.Contains("✅ Заказ на"))
+                        {
+                            InlineKeyboardButton yesButton = InlineKeyboardButton.WithCallbackData("✅ Да");
+                            InlineKeyboardButton noButton = InlineKeyboardButton.WithCallbackData("❌ Нет");
+
+                            List<List<InlineKeyboardButton>> answerGroupsOfButtons = new List<List<InlineKeyboardButton>>();
+
+                            answerGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { yesButton, noButton }));
+
+                            var answerInlineKeyboard = new InlineKeyboardMarkup(answerGroupsOfButtons);
+
+                            var message = await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Вы зарегистрированы на сайте?", replyMarkup: answerInlineKeyboard);
+                            lastMessage = "Вы зарегистрированы на сайте?";
+                        }
+
                         break;
                 }
             }
+        }
+
+        private static User IsGoodLoginData(string emailLogin, string passwordLogin)
+        {
+            // подключение к БД и проверка есть ли такие данные в таблице user
+
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    MySqlCommand sqlCommand = sqlConnection.CreateCommand();
+                    // Избавиться от возможного SQL_Injection
+                    sqlCommand.CommandText = $"SELECT * FROM user WHERE email=\"{emailLogin}\" AND password=\"{passwordLogin}\" LIMIT 1;";
+                    sqlCommand.Connection = sqlConnection;
+
+                    using (DbDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            user = new User(Int32.Parse(reader["id"].ToString()), reader["name"].ToString(), reader["email"].ToString(), reader["password"].ToString(), reader["role"].ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                //categories.Add(ex.Message);
+            }
+
+            return user;
         }
 
         private static string WrapTextByHtmlTemplate(string text)
@@ -679,8 +758,6 @@ namespace TelegramShop
 
                     break;
 
-
-
                 case "🌍 Наши магазины на карте (Харьков)":
 
                     //await Bot.SendLocationAsync(message.From.Id, latitude: 49.993698f, longitude: 36.231924f);
@@ -716,6 +793,72 @@ namespace TelegramShop
 
                     switch (lastMessage)
                     {
+
+                        case "Введите логин (email):":
+
+                            if (message.Text != "Введите логин (email):")
+                                emailLogin = message.Text;
+
+                            await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль:");
+
+                            lastMessage = "Введите пароль:";
+
+                            break;
+
+                        case "Введите пароль:":
+
+                            if (message.Text != "Введите пароль:")
+                            {
+                                passwordLogin = message.Text;
+
+                                if (IsGoodLoginData(emailLogin, passwordLogin) != null)
+                                {
+                                    /* id
+                                     * user_name
+                                     * user_phone
+                                     * user_comment
+                                     * user_id
+                                     * date
+                                     * products
+                                     * status
+                                     */
+
+                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите данные для выполнения заказа: ");
+                                }
+                                else
+                                {
+                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите логин (email):");
+                                    lastMessage = "Введите логин (email):";
+                                }
+                            }
+
+                            break;
+
+                        //    // "Введите пароль:":
+
+                        //    passwordLogin = message.Text;
+
+                        //    if (IsGoodLoginData(emailLogin, passwordLogin) != null)
+                        //    {
+                        //        /* id
+                        //         * user_name
+                        //         * user_phone
+                        //         * user_comment
+                        //         * user_id
+                        //         * date
+                        //         * products
+                        //         * status
+                        //         */
+
+                        //        await Bot.SendTextMessageAsync(message.From.Id, "Введите данные для выполнения заказа: ");
+                        //    }
+                        //    else
+                        //    {
+                        //        GetLogin(message.From.Id);
+                        //    }
+
+                        //    break;
+
                         case "Название товара содержит:":
 
                             // отобразить все товары с именем, содержащим часть, введенную пользователем
