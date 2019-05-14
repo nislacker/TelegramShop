@@ -18,10 +18,40 @@ namespace TelegramShop
 
             for (int i = 0; i < ProductDetails.Count; ++i)
             {
-                totalPrice += ProductDetails[i].Product.price;
+                totalPrice += ProductDetails[i].Product.price * ProductDetails[i].Count;
             }
 
             return totalPrice;
+        }
+
+        public int GetProductsCount()
+        {
+            int count = 0;
+
+            for (int i = 0; i < ProductDetails.Count; ++i)
+            {
+                count += ProductDetails[i].Count;
+            }
+
+            return count;
+        }
+
+        public void SetProductCount(ProductDetail productDetail, int count)
+        {
+            if (count <= 0) return;
+
+            int i = ProductIndexInCart(productDetail);
+            ProductDetails[i].Count = count;
+        }
+
+        public void IncrementProductCount(ProductDetail productDetail)
+        {
+            SetProductCount(productDetail, productDetail.Count + 1);
+        }
+
+        public void DecrementProductCount(ProductDetail productDetail)
+        {
+            SetProductCount(productDetail, productDetail.Count - 1);
         }
 
         public bool DeleteProductDetailByProductDetail(ProductDetail productDetail)

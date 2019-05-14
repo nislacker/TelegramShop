@@ -380,6 +380,54 @@ namespace TelegramShop
 
                         break;
 
+                    case "🔺":
+
+                        p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
+
+                        productsInCart = cart.GetProductDetails();
+
+                        int index = cart.ProductIndexInCart(p);
+
+                        var currentProductDetail = productsInCart[index];
+
+                        cart.IncrementProductCount(currentProductDetail);
+
+
+
+                        ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{currentProductDetail.Product.id}.jpg";
+
+                        txt = $"{productsInCart[0].Product.name}\nЦена: {currentProductDetail.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{currentProductDetail.Product.id}";
+
+                        SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, currentProductDetail, index);
+
+                        // удаление сообщения
+                        await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+
+                        break;
+
+                    case "🔻":
+
+                        p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
+
+                        productsInCart = cart.GetProductDetails();
+
+                        index = cart.ProductIndexInCart(p);
+
+                        currentProductDetail = productsInCart[index];
+
+                        cart.DecrementProductCount(currentProductDetail);
+
+                        ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{currentProductDetail.Product.id}.jpg";
+
+                        txt = $"{productsInCart[0].Product.name}\nЦена: {currentProductDetail.Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{currentProductDetail.Product.id}";
+
+                        SendImageAndTextWithoutButtonInCart(e.CallbackQuery.From.Id, ImageUrl, txt, currentProductDetail, index);
+
+                        // удаление сообщения
+                        await Bot.DeleteMessageAsync(e.CallbackQuery.From.Id, e.CallbackQuery.Message.MessageId);
+
+                        break;
+
                     case "❌":
 
                         // если в корзине это единственный товар, то показать сообщение что в корзине нет товаров, 
@@ -392,9 +440,11 @@ namespace TelegramShop
 
                         int currentProductIndex = cart.ProductIndexInCart(p);
 
-                        ProductDetail currentProductDetail = productsInCart[currentProductIndex];
+                        currentProductDetail = productsInCart[currentProductIndex];
 
                         cart.DeleteProductDetailByProductDetail(currentProductDetail);
+
+                        ShowMenu(e.CallbackQuery.From.Id, cart.GetProductsCount());
 
                         if (productsInCart.Count == 0)
                         {
