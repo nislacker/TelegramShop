@@ -31,7 +31,7 @@ namespace TelegramShop
         static List<Product> products = new List<Product>();
         static bool isDouble;
         static double minPrice = 0;
-        static int productsInCart = 0;
+        static int productsInCartCount = 0;
 
         static Dictionary<int, Product> messageIdProductPairs = new Dictionary<int, Product>();
 
@@ -322,21 +322,13 @@ namespace TelegramShop
                         // Нужно добавить товар в корзину, который захотели поместить в корзину!
                         // И радом с кнопкой "🛒 Корзина" обновить количество в ней товара "🛒 Корзина (3)" -- вот так, например
 
-                        ++productsInCart;
-                        ShowMenu(e.CallbackQuery.From.Id, productsInCart);
+                        ++productsInCartCount;
+                        ShowMenu(e.CallbackQuery.From.Id, productsInCartCount);
 
                         var p = messageIdProductPairs[e.CallbackQuery.Message.MessageId];
 
                         cart.Add(new ProductDetail { Count = 1, Product = p });
-
-                        string info = "";
-
-                        foreach (var item in cart.GetProductDetails())
-                        {
-                            info += item.Product.name + ": " + item.Count + "\n";
-                        }
-
-                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, info);
+                        
                         //lastMessage = "Укажите количество:";
                         break;
                     default:
@@ -361,7 +353,6 @@ namespace TelegramShop
             categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { putToCartButton }));
             var catalogInlineKeyboard = new InlineKeyboardMarkup(categoriesGroupsOfButtons);
 
-
             using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
             {
                 string fileName = ImageUrl.Split('\\').Last();
@@ -369,6 +360,39 @@ namespace TelegramShop
 
                 // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
                 messageIdProductPairs.Add(message.MessageId, product);
+            }
+        }
+
+        public static async void SendImageAndTextWithoutButtonInCart(int chatId, string ImageUrl, string text, ProductDetail productDetail, int productDetailPosition)
+        {
+            InlineKeyboardButton deleteFromCartButton = InlineKeyboardButton.WithCallbackData("❌");
+            InlineKeyboardButton putOnOneMoreToCartButton = InlineKeyboardButton.WithCallbackData("🔺");
+            InlineKeyboardButton countInCartButton = InlineKeyboardButton.WithCallbackData(productDetail.Count.ToString() + " шт.");
+            InlineKeyboardButton putOnOffMoreToCartButton = InlineKeyboardButton.WithCallbackData("🔻");
+
+            InlineKeyboardButton prevProductInCartButton = InlineKeyboardButton.WithCallbackData("◀");
+            InlineKeyboardButton positionOfProductInCartButton = InlineKeyboardButton.WithCallbackData((productDetailPosition + 1) + "/" + cart.GetProductDetails().Count());
+            InlineKeyboardButton nextProductInCartButton = InlineKeyboardButton.WithCallbackData("▶");
+
+            InlineKeyboardButton confirmOrderButton = InlineKeyboardButton.WithCallbackData($"✅ Заказ на {cart.GetCartTotalPrice()} грн. Оформить?");
+
+            List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { deleteFromCartButton, putOnOneMoreToCartButton, countInCartButton, putOnOffMoreToCartButton }));
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { prevProductInCartButton, positionOfProductInCartButton, nextProductInCartButton }));
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { confirmOrderButton }));
+
+            var catalogInlineKeyboard = new InlineKeyboardMarkup(categoriesGroupsOfButtons);
+
+            using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
+            {
+                string fileName = ImageUrl.Split('\\').Last();
+                var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
+
+                // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
+                messageIdProductPairs.Add(message.MessageId, productDetail.Product);
             }
         }
 
@@ -432,6 +456,9 @@ namespace TelegramShop
             if (message == null || message.Type != MessageType.Text)
                 return;
 
+            if (message.Text.Contains("🛒 Корзина"))
+                message.Text = "🛒 Корзина";
+
             switch (message.Text)
             {
                 case "/start":
@@ -449,7 +476,7 @@ namespace TelegramShop
 
                 // клавиатура
                 case "/keyboard":
-                    ShowMenu(message.From.Id, productsInCart);
+                    ShowMenu(message.From.Id, productsInCartCount);
                     break;
                 case "📁 Каталог":
                     // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
@@ -487,15 +514,37 @@ namespace TelegramShop
 
                     break;
 
-                case "🛒 Корзина":
-
-
-                    break;
+                
 
                 case "🌍 Наши магазины на карте (Харьков)":
 
                     //await Bot.SendLocationAsync(message.From.Id, latitude: 49.993698f, longitude: 36.231924f);
                     SendImageAndText(message.From.Id, "Map.jpg", "<a href='https://scehlov.000webhostapp.com/shops/'>Наши магазины</a>", null);
+                    break;
+
+                case "🛒 Корзина":
+                    //await Bot.SendTextMessageAsync(message.Chat.Id, "КОРЗИНА!");
+
+                    /*
+                    string info = "";
+
+                    foreach (var item in cart.GetProductDetails())
+                    {
+                        info += item.Product.name + ": " + item.Count + "\n";
+                    }
+                    
+                    await Bot.SendTextMessageAsync(message.From.Id, info);
+                    */
+
+                    var productsInCart = cart.GetProductDetails();
+                    //var firstProductInCart = productsInCart.First();
+
+                    var ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{productsInCart[0].Product.id}.jpg";
+
+                    string txt = $"{productsInCart[0].Product.name}\nЦена: {productsInCart[0].Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{productsInCart[0].Product.id}";
+
+                    SendImageAndTextWithoutButtonInCart(message.From.Id, ImageUrl, txt, productsInCart[0], 0);
+
                     break;
 
                 default:

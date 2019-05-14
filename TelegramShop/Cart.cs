@@ -12,9 +12,21 @@ namespace TelegramShop
 
         public List<ProductDetail> GetProductDetails() { return ProductDetails; }
 
+        public double GetCartTotalPrice()
+        {
+            double totalPrice = 0;
+
+            for (int i = 0; i < ProductDetails.Count; ++i)
+            {
+                totalPrice += ProductDetails[i].Product.price;
+            }
+
+            return totalPrice;
+        }
+
         public int IsCartContainProduct(ProductDetail productDetail)
         {
-            for(int i = 0; i< ProductDetails.Count; ++i)
+            for (int i = 0; i < ProductDetails.Count; ++i)
             {
                 if (ProductDetails[i].Product.id == productDetail.Product.id)
                     return i;
