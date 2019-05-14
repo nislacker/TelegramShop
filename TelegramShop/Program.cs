@@ -21,6 +21,7 @@ using System.Text.RegularExpressions;
 using Telegram;
 using System.IO;
 using System.Net;
+using System.Data.SqlClient;
 
 namespace TelegramShop
 {
@@ -850,6 +851,8 @@ namespace TelegramShop
                                 productOrder.User_comment = message.Text;
                             }
 
+                            CreateProductOrderRecord(productOrder);
+
                             break;
 
                         case "Название товара содержит:":
@@ -940,6 +943,62 @@ namespace TelegramShop
                     }
 
                     break;
+            }
+        }
+
+        private static void CreateProductOrderRecord(ProductOrder productOrder)
+        {
+            productOrder.Date = DateTime.Now;
+
+            // {"35":1,"32":1}
+
+            StringBuilder res = new StringBuilder("{");
+
+            foreach (ProductDetail pd in cart.GetProductDetails())
+            {
+                res.Append($"\"{pd.Product.id}\":{pd.Count},");
+            }
+
+            if (res.Length > 1)
+                res[res.Length - 1] = '}';
+            else
+                res.Append('}');
+
+            productOrder.Products = res.ToString();
+            productOrder.Status = 1;
+            productOrder.User_id = user.Id;
+            productOrder.User_name = user.Name;
+
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    // Оператор SQL
+                    string sql = string.Format("INSERT INTO product_order (user_name, user_phone, user_comment, user_id, date, products, status) VALUES (@User_name, @User_phone, @User_comment, @User_id, @Date, @Products, @Status);");
+
+                    using (MySqlCommand cmd = new MySqlCommand(sql, sqlConnection))
+                    {
+                        // Добавить параметры
+                        cmd.Parameters.AddWithValue("@User_name", productOrder.User_name);
+                        cmd.Parameters.AddWithValue("@User_phone", productOrder.User_phone);
+                        cmd.Parameters.AddWithValue("@User_comment", productOrder.User_comment);
+                        cmd.Parameters.AddWithValue("@User_id", productOrder.User_id);
+                        cmd.Parameters.AddWithValue("@Date", productOrder.Date);
+                        cmd.Parameters.AddWithValue("@Products", productOrder.Products);
+                        cmd.Parameters.AddWithValue("@Status", productOrder.Status);
+
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                //categories.Add(ex.Message);
             }
         }
 
