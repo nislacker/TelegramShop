@@ -249,7 +249,7 @@ namespace TelegramShop
             // выдаст имя бота
             var me = Bot.GetMeAsync().Result;
 
-            Console.WriteLine(me.FirstName); // название бота: "Чат-бот 08.05.19"
+            Console.WriteLine(me.FirstName); // название бота: "EShop777bot"
             // начать получение сообщений
             Bot.StartReceiving();
 
