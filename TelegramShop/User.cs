@@ -14,6 +14,11 @@ namespace TelegramShop
         public string Password { get; set; }
         public string Role { get; set; }
 
+        public User()
+        {
+
+        }
+
         public User(int id, string name, string email, string password, string role)
         {
             Id = id;

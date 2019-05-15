@@ -37,9 +37,12 @@ namespace TelegramShop
         static string emailLogin;
         static string passwordLogin;
 
-        static User user = null;
+        static User user = new User();
+
+        static User newUser = new User();
 
         static ProductOrder productOrder = new ProductOrder();
+        static ProductOrder productOrderForNewUser = new ProductOrder();
 
         static Dictionary<int, Product> messageIdProductPairs = new Dictionary<int, Product>();
 
@@ -504,13 +507,15 @@ namespace TelegramShop
 
                     case "✅ Да":
 
-                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите логин (email):");
-                        lastMessage = "Введите логин (email):";
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Введите email:");
+                        lastMessage = "Введите email:";
 
                         break;
 
                     case "❌ Нет":
 
+                        await Bot.SendTextMessageAsync(e.CallbackQuery.From.Id, "Регистрация для заказа обязательна\nВведите имя:");
+                        lastMessage = "Регистрация для заказа обязательна\nВведите имя:";
 
                         break;
 
@@ -782,18 +787,61 @@ namespace TelegramShop
 
                     switch (lastMessage)
                     {
+                        case "Регистрация для заказа обязательна\nВведите имя:":
 
-                        case "Введите логин (email):":
-
-                            if (message.Text != "Введите логин (email):")
-                                emailLogin = message.Text;
-
-                            await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль:");
-
-                            lastMessage = "Введите пароль:";
+                            if (message.Text != "Регистрация для заказа обязательна\nВведите имя:")
+                            {
+                                newUser.Name = message.Text;
+                                await Bot.SendTextMessageAsync(message.From.Id, "Введите email: ");
+                                lastMessage = "Введите email: ";
+                            }
 
                             break;
 
+                        // для незарегистрированного пользователя
+                        case "Введите email: ":
+
+                            if (message.Text != "Введите email:")
+                            {
+                                newUser.Email = message.Text;
+                                await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль: ");
+                                lastMessage = "Введите пароль: ";
+                            }
+
+                            break;
+
+                        // для незарегистрированного пользователя
+                        case "Введите пароль: ":
+
+                            if (message.Text != "Введите пароль: ")
+                            {
+                                newUser.Password = message.Text;
+
+                                 CreateNewUserRecord(newUser);                                
+
+                                await Bot.SendTextMessageAsync(message.From.Id, "Введите свой телефон: ");
+                                lastMessage = "Введите свой телефон: ";
+
+
+
+                                //await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль: ");
+                            }
+
+                            break;
+
+                        // для зарегистрированного пользователя
+                        case "Введите email:":
+
+                            if (message.Text != "Введите email:")
+                            {
+                                emailLogin = message.Text;
+                                await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль:");
+                                lastMessage = "Введите пароль:";
+                            }
+
+                            break;
+
+                        // для зарегистрированного пользователя
                         case "Введите пароль:":
 
                             if (message.Text != "Введите пароль:")
@@ -825,8 +873,8 @@ namespace TelegramShop
                                 }
                                 else
                                 {
-                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите логин (email):");
-                                    lastMessage = "Введите логин (email):";
+                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите email:");
+                                    lastMessage = "Введите email:";
                                 }
                             }
 
@@ -844,6 +892,19 @@ namespace TelegramShop
 
                             break;
 
+                        // для незарегистрированного пользователя
+                        case "Введите свой телефон: ":
+
+                            if ((message.Text != "Введите свой телефон: ") && (message.Text != "Отмена"))
+                            {
+                                productOrderForNewUser.User_phone = message.Text;
+                            }
+
+                            await Bot.SendTextMessageAsync(message.From.Id, "Комментарий: ");
+                            lastMessage = "Комментарий: ";
+
+                            break;
+
                         case "Комментарий:":
 
                             if ((message.Text != "Комментарий:") && (message.Text != "Отмена"))
@@ -851,7 +912,20 @@ namespace TelegramShop
                                 productOrder.User_comment = message.Text;
                             }
 
-                            CreateProductOrderRecord(productOrder);
+                            CreateProductOrderRecord(productOrder, user);
+
+                            break;
+
+                        // для незарегистрированного пользователя
+                        case "Комментарий: ":
+
+                            if ((message.Text != "Комментарий: ") && (message.Text != "Отмена"))
+                            {
+                                productOrderForNewUser.User_comment = message.Text;
+                            }
+                            
+                            
+                            CreateProductOrderRecord(productOrderForNewUser, newUser);
 
                             break;
 
@@ -946,7 +1020,71 @@ namespace TelegramShop
             }
         }
 
-        private static void CreateProductOrderRecord(ProductOrder productOrder)
+        public static void CreateNewUserRecord(User user)
+        {
+            user.Role = "user";
+
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    // Оператор SQL
+                    string sql = string.Format("INSERT INTO user (name, email, password, role) VALUES (@name, @email, @password, @role);");
+
+                    using (MySqlCommand cmd = new MySqlCommand(sql, sqlConnection))
+                    {
+                        // Добавить параметры
+                        cmd.Parameters.AddWithValue("@name", user.Name);
+                        cmd.Parameters.AddWithValue("@email", user.Email);
+                        cmd.Parameters.AddWithValue("@password", user.Password);
+                        cmd.Parameters.AddWithValue("@role", user.Role);
+
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                //categories.Add(ex.Message);
+            }
+
+            //////
+            ///
+            // Найти Id созданного юзера и присвоить его же сущности (объекту класса User, представляющий из себя запись в таблице user)
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    MySqlCommand sqlCommand = sqlConnection.CreateCommand();
+                    sqlCommand.CommandText = $"SELECT id FROM user WHERE name=\"{user.Name}\" LIMIT 1;";
+                    sqlCommand.Connection = sqlConnection;
+
+                    using (DbDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            user.Id = Int32.Parse(reader["id"].ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                //categories.Add(ex.Message);
+            }
+        }
+
+        private static void CreateProductOrderRecord(ProductOrder productOrder, User user)
         {
             productOrder.Date = DateTime.Now;
 
