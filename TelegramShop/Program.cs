@@ -35,6 +35,7 @@ namespace TelegramShop
         static int productsInCartCount = 0;
 
         static string emailLogin;
+        static int confirmationСode; // код подтвержения почты: 5 цифр
         static string passwordLogin;
 
         static User user = new User();
@@ -816,9 +817,46 @@ namespace TelegramShop
                             if (message.Text != "Введите email:")
                             {
                                 newUser.Email = message.Text;
-                                await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль: ");
-                                lastMessage = "Введите пароль: ";
+
+                                // проверка правильности формата адреса почты
+
+                                bool isEmailValid = EmailChecker.IsValidEmailAddress(newUser.Email);
+
+                                if (isEmailValid == false)
+                                {
+                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите email: ");
+                                    lastMessage = "Введите email: ";
+                                    break;
+                                }
+
+                                // генерация кода подтверждения
+                                Random r = new Random();
+                                confirmationСode = r.Next(10000, 100000);
+
+                                // отправка на мыло кода подтверждения
+                                Email email = new Email("nislacker@gmail.com", "coolprogrammer555", newUser.Email, $"EShop. Подтвердите Email", $"Вас приветствует магазин женской одежды EShop!\nДля подтверждения своей эл. почты, введите в Telegram-магазине код подтверждения: {confirmationСode}");
+                                email.Send();
+
+                                await Bot.SendTextMessageAsync(message.From.Id, "Введите код подтверждения Email (он выслан на указанный email): ");
+                                lastMessage = "Введите код подтверждения Email (он выслан на указанный email): ";
                             }
+
+                            break;
+
+                        // для незарегистрированного пользователя
+                        case "Введите код подтверждения Email (он выслан на указанный email): ":
+
+                            int userCode;
+
+                            if ((Int32.TryParse(message.Text, out userCode) == false) || (confirmationСode != userCode))
+                            {
+                                await Bot.SendTextMessageAsync(message.From.Id, "Введите код подтверждения Email (он выслан на указанный email): ");
+                                lastMessage = "Введите код подтверждения Email (он выслан на указанный email): ";
+                                break;
+                            }
+
+                            await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль: ");
+                            lastMessage = "Введите пароль: ";
 
                             break;
 
@@ -833,10 +871,6 @@ namespace TelegramShop
 
                                 await Bot.SendTextMessageAsync(message.From.Id, "Введите свой телефон: ");
                                 lastMessage = "Введите свой телефон: ";
-
-
-
-                                //await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль: ");
                             }
 
                             break;
@@ -847,6 +881,20 @@ namespace TelegramShop
                             if (message.Text != "Введите email:")
                             {
                                 emailLogin = message.Text;
+
+                                // проверка правильности формата адреса почты
+
+                                bool isEmailValid = EmailChecker.IsValidEmailAddress(emailLogin);
+
+                                if (isEmailValid == false)
+                                {
+                                    await Bot.SendTextMessageAsync(message.From.Id, "Введите email:");
+                                    lastMessage = "Введите email:";
+                                    break;
+                                }
+
+                                //
+
                                 await Bot.SendTextMessageAsync(message.From.Id, "Введите пароль:");
                                 lastMessage = "Введите пароль:";
                             }
@@ -1096,6 +1144,12 @@ namespace TelegramShop
             }
         }
 
+        public static void SendOrderInfoToUserEmail(User user, long orderId, DateTime dateTime)
+        {
+            Email email = new Email("nislacker@gmail.com", "coolprogrammer555", newUser.Email, $"EShop. Заказ {orderId} оформлен!", $"Здравствуйте, {user.Name}!\nВас приветствует магазин женской одежды EShop!\nЗаказ, сделанный Вами в Telegram-магазине {dateTime.ToString("dd.MM.yyyy, в HH:mm")} успешно сохранен и в скором времени будет обработан.\nБлагорадрим за покупки!");
+            email.Send();
+        }
+
         private static void CreateProductOrderRecord(ProductOrder productOrder, User user)
         {
             productOrder.Date = DateTime.Now;
@@ -1121,6 +1175,8 @@ namespace TelegramShop
 
             try
             {
+                long orderId;
+
                 using (MySqlConnection sqlConnection = new MySqlConnection())
                 {
                     sqlConnection.ConnectionString = connectionString;
@@ -1142,8 +1198,11 @@ namespace TelegramShop
                         cmd.Parameters.AddWithValue("@Status", productOrder.Status);
 
                         cmd.ExecuteNonQuery();
+                        orderId = cmd.LastInsertedId;
                     }
                 }
+
+                SendOrderInfoToUserEmail(user, orderId, productOrder.Date);
             }
             catch (Exception ex)
             {
