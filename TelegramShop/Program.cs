@@ -580,7 +580,7 @@ namespace TelegramShop
             return "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title></title></head><body>" + text + "</body></html>";
         }
 
-        public static async void SendImageAndText(int chatId, string ImageUrl, string text, Product product)
+        public static async void SendImageAndTextWithInCartButton(int chatId, string ImageUrl, string text, Product product)
         {
             InlineKeyboardButton putToCartButton;
 
@@ -595,6 +595,18 @@ namespace TelegramShop
             {
                 string fileName = ImageUrl.Split('\\').Last();
                 var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
+
+                // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
+                messageIdProductPairs.Add(message.MessageId, product);
+            }
+        }
+
+        public static async void SendImageAndText(int chatId, string ImageUrl, string text, Product product)
+        {
+            using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
+            {
+                string fileName = ImageUrl.Split('\\').Last();
+                var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html);
 
                 // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
                 messageIdProductPairs.Add(message.MessageId, product);
@@ -639,7 +651,7 @@ namespace TelegramShop
             var ImageUrl = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{product.id}.jpg";
             string text = $"{product.name}\nЦена: {product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{product.id}";
 
-            SendImageAndText(chatId, ImageUrl, text, product);
+            SendImageAndTextWithInCartButton(chatId, ImageUrl, text, product);
         }
 
         public static async void ShowMenu(int chatId, int productsInCart)
