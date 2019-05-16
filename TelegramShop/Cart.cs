@@ -12,7 +12,7 @@ namespace TelegramShop
 
         public List<ProductDetail> GetProductDetails() { return ProductDetails; }
 
-        public double GetCartTotalPrice()
+        public double GetProductsTotalPrice(List<ProductDetail> ProductDetails)
         {
             double totalPrice = 0;
 

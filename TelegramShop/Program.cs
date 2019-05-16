@@ -47,13 +47,16 @@ namespace TelegramShop
 
         static Dictionary<int, Product> messageIdProductPairs = new Dictionary<int, Product>();
 
-        //static List<ProductDetail> cart = new List<ProductDetail>();
+        static List<ProductDetail> currentOrder = new List<ProductDetail>();
+
         static Cart cart = new Cart();
 
         // последнее сообщение, посланное ботом для идентификации на какой вопрос отвечает пользователь
         static string lastMessage;
 
         static string connectionString = ConfigurationManager.ConnectionStrings["ConnectionString"].ConnectionString;
+
+        static List<ProductDetail> productDetails = null;
 
         static public List<string> GetAllCategories()
         {
@@ -234,30 +237,37 @@ namespace TelegramShop
 
         static void Main(string[] args)
         {
-            string API_token = System.Configuration.ConfigurationManager.AppSettings["TelegramBot_API_Token"];
-            // создать клиента бота на основе токена, который даёт Botfather
-            // при создании бота
-            Bot = new TelegramBotClient(API_token);
+            try
+            {
+                string API_token = System.Configuration.ConfigurationManager.AppSettings["TelegramBot_API_Token"];
+                // создать клиента бота на основе токена, который даёт Botfather
+                // при создании бота
+                Bot = new TelegramBotClient(API_token);
 
-            // подписка на событие -- когда будет приходить сообщение,
-            // будет вызываться метод BotOnMessageReceived
-            Bot.OnMessage += BotOnMessageReceived;
+                // подписка на событие -- когда будет приходить сообщение,
+                // будет вызываться метод BotOnMessageReceived
+                Bot.OnMessage += BotOnMessageReceived;
 
-            // а это для InlineKeyboardButton.WithCallbackData("Пункт 2")
-            // при нажатии на кнопку "Пункт 2" будет срабатывать метод BonOnCallbackReceived
-            Bot.OnCallbackQuery += BonOnCallbackReceived;
+                // а это для InlineKeyboardButton.WithCallbackData("Пункт 2")
+                // при нажатии на кнопку "Пункт 2" будет срабатывать метод BonOnCallbackReceived
+                Bot.OnCallbackQuery += BonOnCallbackReceived;
 
-            // выдаст имя бота
-            var me = Bot.GetMeAsync().Result;
+                // выдаст имя бота
+                var me = Bot.GetMeAsync().Result;
 
-            Console.WriteLine(me.FirstName); // название бота: "EShop777bot"
-            // начать получение сообщений
-            Bot.StartReceiving();
+                Console.WriteLine(me.FirstName); // название бота: "EShop777bot"
+                                                 // начать получение сообщений
+                Bot.StartReceiving();
 
-            Console.ReadLine();
+                Console.ReadLine();
 
-            // остановить получение сообщений
-            Bot.StopReceiving();
+                // остановить получение сообщений
+                Bot.StopReceiving();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
         }
 
         public static string MinifyHTML(string html)
@@ -625,7 +635,7 @@ namespace TelegramShop
             InlineKeyboardButton positionOfProductInCartButton = InlineKeyboardButton.WithCallbackData((productDetailPosition + 1) + "/" + cart.GetProductDetails().Count());
             InlineKeyboardButton nextProductInCartButton = InlineKeyboardButton.WithCallbackData("▶");
 
-            InlineKeyboardButton confirmOrderButton = InlineKeyboardButton.WithCallbackData($"✅ Заказ на {cart.GetCartTotalPrice()} грн. Оформить?");
+            InlineKeyboardButton confirmOrderButton = InlineKeyboardButton.WithCallbackData($"✅ Заказ на {cart.GetProductsTotalPrice(cart.GetProductDetails())} грн. Оформить?");
 
             List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
 
@@ -637,13 +647,62 @@ namespace TelegramShop
 
             var catalogInlineKeyboard = new InlineKeyboardMarkup(categoriesGroupsOfButtons);
 
-            using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
+            try
             {
-                string fileName = ImageUrl.Split('\\').Last();
-                var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
+                using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
+                {
+                    string fileName = ImageUrl.Split('\\').Last();
+                    var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
 
-                // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
-                messageIdProductPairs.Add(message.MessageId, productDetail.Product);
+                    // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
+                    messageIdProductPairs.Add(message.MessageId, productDetail.Product);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+        }
+
+        //public static List<ProductDetail> GetProductDetailsByOrder(ProductOrder productOrder)
+        //{
+        //    return productOrder.Products;
+        //}
+
+        public static async void SendImageAndTextWithoutButtonInOrders(int chatId, string ImageUrl, string text, ProductDetail productDetail, int productDetailPosition)
+        {
+            InlineKeyboardButton countInOrderButton = InlineKeyboardButton.WithCallbackData(productDetail.Count.ToString() + " шт.");
+
+            InlineKeyboardButton prevProductInOrderButton = InlineKeyboardButton.WithCallbackData("◀");
+            InlineKeyboardButton positionOfProductInOrderButton = InlineKeyboardButton.WithCallbackData((productDetailPosition + 1) + "/" + cart.GetProductDetails().Count());
+            InlineKeyboardButton nextProductInOrderButton = InlineKeyboardButton.WithCallbackData("▶");
+
+            InlineKeyboardButton confirmOrderButton = InlineKeyboardButton.WithCallbackData($"Заказ на {cart.GetProductsTotalPrice(currentOrder)} грн.");
+
+            List<List<InlineKeyboardButton>> categoriesGroupsOfButtons = new List<List<InlineKeyboardButton>>();
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { countInOrderButton }));
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { prevProductInOrderButton, positionOfProductInOrderButton, nextProductInOrderButton }));
+
+            categoriesGroupsOfButtons.Add(new List<InlineKeyboardButton>(new[] { confirmOrderButton }));
+
+            var catalogInlineKeyboard = new InlineKeyboardMarkup(categoriesGroupsOfButtons);
+
+            try
+            {
+                using (var stream = System.IO.File.Open(ImageUrl, FileMode.Open))
+                {
+                    string fileName = ImageUrl.Split('\\').Last();
+                    var message = await Bot.SendPhotoAsync(chatId, new InputOnlineFile(stream, fileName), text, ParseMode.Html, replyMarkup: catalogInlineKeyboard);
+
+                    // добавляем подробности о сообщении для идентификации товара в сообщении -- для идентификации какой товар хочет поместить в корзину пользователь
+                    messageIdProductPairs.Add(message.MessageId, productDetail.Product);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
             }
         }
 
@@ -695,6 +754,130 @@ namespace TelegramShop
             lastMessage = "Меню";
         }
 
+        /*
+                 static public List<Product> GetAllProducts()
+        {
+            List<Product> products = new List<Product>();
+
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    MySqlCommand sqlCommand = sqlConnection.CreateCommand();
+                    // Избавиться от возможного SQL_Injection
+                    sqlCommand.CommandText = $"SELECT * FROM product;";
+                    sqlCommand.Connection = sqlConnection;
+
+                    using (DbDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            products.Add(new Product(Int32.Parse(reader["id"].ToString()), reader["name"].ToString(), Int32.Parse(reader["category_id"].ToString()), Int32.Parse(reader["code"].ToString()), double.Parse(reader["price"].ToString()), Int32.Parse(reader["availability"].ToString()), reader["brand"].ToString(), reader["description"].ToString(), Int32.Parse(reader["is_new"].ToString()), Int32.Parse(reader["is_recommended"].ToString()), Int32.Parse(reader["status"].ToString())));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return products;
+        }
+             */
+
+        private static List<ProductOrder> GetAllOrdersFromUser(User user)
+        {
+            List<ProductOrder> productOrders = new List<ProductOrder>();
+
+            // ищем все заказы от пользователя по его Id -- поле user_id таблицы product_order
+            // user.Id
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+
+                    sqlConnection.Open();
+
+                    MySqlCommand sqlCommand = sqlConnection.CreateCommand();
+                    // Избавиться от возможного SQL_Injection
+                    sqlCommand.CommandText = $"SELECT * FROM product_order WHERE user_id={user.Id};";
+                    sqlCommand.Connection = sqlConnection;
+
+                    using (DbDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            //                   int id, string user_name, string user_phone, string user_comment, int user_id, DateTime date, string products, int status)
+                            productOrders.Add(new ProductOrder(Int32.Parse(reader["id"].ToString()), reader["user_name"].ToString(), reader["user_phone"].ToString(), reader["user_comment"].ToString(), Int32.Parse(reader["user_id"].ToString()),
+                                DateTime.Parse(reader["date"].ToString()), // ???
+                                reader["products"].ToString(), Int32.Parse(reader["status"].ToString())));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return productOrders;
+        }
+
+        public static List<List<ProductDetail>> GetProductDetailsOfAllUserOrders(List<ProductOrder> productOrders)
+        {
+            productDetails = new List<ProductDetail>();
+
+            List<List<ProductDetail>> listOfProductDetails = new List<List<ProductDetail>>();
+
+            // парсим значение поля products, имеющее формат JSON: {"35":1,"32":1} в объекты класса ProductDetail (ссылка на товар + кол-во)
+
+            foreach (var productOrder in productOrders)
+            {
+                string products = productOrder.Products;
+
+                productDetails = ParseProductDetailFromProducts(products);
+
+                listOfProductDetails.Add(productDetails);
+            }
+
+            return listOfProductDetails;
+        }
+
+        private static List<ProductDetail> ParseProductDetailFromProducts(string products)
+        {
+            List<ProductDetail> productDetails = new List<ProductDetail>();
+
+            // {"35":1,"32":1}
+
+            StringBuilder sb = new StringBuilder(products);
+            // Удаляем первый и последний символы -- фигурные скобки -- ГОВНОКОД
+            sb = new StringBuilder(sb.ToString().Substring(1, sb.Length - 2));
+
+            string[] productDetailsStrings = sb.ToString().Split(',');
+
+            // "35":1
+            foreach (string productDetailString in productDetailsStrings)
+            {
+                string[] productAndCount = sb.ToString().Split(':');
+
+                string product = productAndCount[0];
+                string productIdString = product.Substring(1, product.Length - 2);
+                int productId = Int32.Parse(productIdString);
+                string countString = productAndCount[1];
+                int count = Int32.Parse(countString);
+
+                productDetails.Add(new ProductDetail(GetProductById(productId), count));
+            }
+
+            return productDetails;
+        }
+
         //  async -- асинхронная обработка получаемых сообщений
         // можно одновременно получать и обрабатывать сообщения от разных пользователей
         private static async void BotOnMessageReceived(object sender, Telegram.Bot.Args.MessageEventArgs e)
@@ -729,6 +912,31 @@ namespace TelegramShop
                 case "/keyboard":
                     ShowMenu(message.From.Id, productsInCartCount);
                     break;
+
+                case "📦 Заказы":
+
+                    if (user.Email == null)
+                    {
+                        await Bot.SendTextMessageAsync(message.From.Id, "Для просмотра заказов авторизуйтесь!");
+                        return;
+                    }
+
+                    List<ProductOrder> productOrders = GetAllOrdersFromUser(user);
+                    List<List<ProductDetail>> productDetails = GetProductDetailsOfAllUserOrders(productOrders);
+
+                    foreach (List<ProductDetail> productsInOrder in productDetails)
+                    {
+                        var ImageUrl2 = $@"C:\\ospanel\\domains\\eshop\\upload\\images\\products\\{productsInOrder[0].Product.id}.jpg";
+
+                        string txt2 = $"{productsInOrder[0].Product.name}\nЦена: {productsInOrder[0].Product.price} грн.\nПодробнее: https://scehlov.000webhostapp.com/product/{productsInOrder[0].Product.id}";
+
+                        currentOrder = productsInOrder;
+
+                        SendImageAndTextWithoutButtonInOrders(message.From.Id, ImageUrl2, txt2, productsInOrder[0], 0);
+                    }
+
+                    break;
+
                 case "📁 Каталог":
                     // отправка текста пользователю ( у каждого пользователя свой отдельный чат с ботом )
                     // message.From.Id -- Id чата
@@ -867,7 +1075,7 @@ namespace TelegramShop
                             {
                                 newUser.Password = message.Text;
 
-                                 CreateNewUserRecord(newUser);                                
+                                CreateNewUserRecord(newUser);
 
                                 await Bot.SendTextMessageAsync(message.From.Id, "Введите свой телефон: ");
                                 lastMessage = "Введите свой телефон: ";
@@ -983,8 +1191,8 @@ namespace TelegramShop
                             {
                                 productOrderForNewUser.User_comment = message.Text;
                             }
-                            
-                            
+
+
                             CreateProductOrderRecord(productOrderForNewUser, newUser);
 
                             break;
@@ -1146,7 +1354,7 @@ namespace TelegramShop
 
         public static void SendOrderInfoToUserEmail(User user, long orderId, DateTime dateTime)
         {
-            Email email = new Email("nislacker@gmail.com", "coolprogrammer555", newUser.Email, $"EShop. Заказ {orderId} оформлен!", $"Здравствуйте, {user.Name}!\nВас приветствует магазин женской одежды EShop!\nЗаказ, сделанный Вами в Telegram-магазине {dateTime.ToString("dd.MM.yyyy, в HH:mm")} успешно сохранен и в скором времени будет обработан.\nБлагорадрим за покупки!");
+            Email email = new Email("nislacker@gmail.com", "coolprogrammer555", user.Email, $"EShop. Заказ {orderId} оформлен!", $"Здравствуйте, {user.Name}!\nВас приветствует магазин женской одежды EShop!\nЗаказ, сделанный Вами в Telegram-магазине {dateTime.ToString("dd.MM.yyyy, в HH:mm")}, успешно сохранен и в скором времени будет обработан.\nБлагорадрим за покупки!");
             email.Send();
         }
 
@@ -1170,8 +1378,18 @@ namespace TelegramShop
 
             productOrder.Products = res.ToString();
             productOrder.Status = 1;
-            productOrder.User_id = user.Id;
-            productOrder.User_name = user.Name;
+
+            // для зарегистрированного пользователя
+            if (user.Name == null)
+            {
+                // email должен быть уникальным для каждого пользователя!
+                user = IsGoodLoginData(user.Email, user.Password);
+            }
+            else
+            {
+                productOrder.User_id = user.Id;
+                productOrder.User_name = user.Name;
+            }
 
             try
             {
@@ -1209,6 +1427,39 @@ namespace TelegramShop
                 Console.WriteLine(ex.Message);
                 //categories.Add(ex.Message);
             }
+        }
+
+        private static Product GetProductById(int id)
+        {
+            Product product = null;
+
+            try
+            {
+                using (MySqlConnection sqlConnection = new MySqlConnection())
+                {
+                    sqlConnection.ConnectionString = connectionString;
+                    sqlConnection.Open();
+
+                    MySqlCommand sqlCommand = sqlConnection.CreateCommand();
+                    // Избавиться от возможного SQL_Injection
+                    sqlCommand.CommandText = $"SELECT * FROM product WHERE id={id} LIMIT 1;"; // ???
+                    sqlCommand.Connection = sqlConnection;
+
+                    using (DbDataReader reader = sqlCommand.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            product = new Product(Int32.Parse(reader["id"].ToString()), reader["name"].ToString(), Int32.Parse(reader["category_id"].ToString()), Int32.Parse(reader["code"].ToString()), double.Parse(reader["price"].ToString()), Int32.Parse(reader["availability"].ToString()), reader["brand"].ToString(), reader["description"].ToString(), Int32.Parse(reader["is_new"].ToString()), Int32.Parse(reader["is_recommended"].ToString()), Int32.Parse(reader["status"].ToString()));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return product;
         }
 
         private static Product GetProductByCode(int code)

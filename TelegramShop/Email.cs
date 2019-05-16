@@ -80,7 +80,12 @@ namespace TelegramShop
                 mailDetails.Attachments.Add(attachment);
             }
 
-            clientDetails.Send(mailDetails);
+
+            // !!!
+            //clientDetails.Send(mailDetails);
+
+
+
             //MessageBox.Show("Your mail has been sent.");
             sendMailInfo.fileName = "";
         }
