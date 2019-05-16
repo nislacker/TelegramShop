@@ -80,6 +80,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Cart.cs" />
+    <Compile Include="Email.cs" />
     <Compile Include="Product.cs" />
     <Compile Include="ProductDetail.cs" />
     <Compile Include="ProductOrder.cs" />
